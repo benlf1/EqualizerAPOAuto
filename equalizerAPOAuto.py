@@ -5,7 +5,6 @@ import time
 import sys
 import ctypes
 import tempfile
-import sounddevice as sd
 from pywinauto import Application
 from pywinauto.timings import wait_until
 from zipfile import ZipFile, BadZipFile
@@ -21,61 +20,6 @@ def run_as_admin():
     if not is_admin():
         print("Run the script as administrator")
         sys.exit()
-
-def is_default_mic_stereo():
-    try:
-        # Get the default input device index
-        default_device_index = sd.default.device[0]
-        # Get device info
-        device_info = sd.query_devices(default_device_index)
-        # Check the 'max_input_channels'
-        return device_info['max_input_channels'] == 2
-    except Exception as e:
-        print(f"Error: {e}")
-        return None
-
-def get_latest_github_release_url(repo, file_prefix, pre_release=False):
-    """
-    Gets the URL of the latest release ZIP file that contains a specified prefix in its name from a GitHub repository.
-    
-    :param repo: The GitHub repository in the format 'owner/repo'.
-    :param file_prefix: The prefix to look for in the ZIP file name.
-    :param pre_release: Boolean indicating whether to include pre-releases.
-    :return: The URL of the latest release ZIP file that contains the specified prefix, or None if not found.
-    """
-    try:
-        # GitHub API URL for the latest releases
-        api_url = f"https://api.github.com/repos/{repo}/releases"
-        
-        # Send a GET request to the API URL
-        response = requests.get(api_url)
-        response.raise_for_status()
-        
-        # Parse the JSON response
-        releases = response.json()
-        
-        # Find the latest release (including pre-releases if specified)
-        latest_release = None
-        for release in releases:
-            if pre_release or not release['prerelease']:
-                latest_release = release
-                break
-        
-        if not latest_release:
-            print("No releases found.")
-            return None
-        
-        # Find the asset that contains the specified prefix
-        for asset in latest_release['assets']:
-            if file_prefix in asset['name'] and asset['content_type'] == 'application/zip':
-                return asset['browser_download_url']
-        
-        print(f"No ZIP file containing '{file_prefix}' found in the latest release.")
-        return None
-    
-    except requests.RequestException as e:
-        print(f"HTTP request failed: {e}")
-        return None
 
 def download_and_extract_zip(url, extract_to):
     """
@@ -243,15 +187,10 @@ def write_specific_string(file_path, specific_string_to_add, default_string=None
 # Step 4: Configure Equalizer APO for the microphone
 def configure_equalizer_apo(microphone_device):
     config_path = os.path.join(os.getenv('ProgramFiles'), 'EqualizerAPO', 'config', 'config.txt')
-
-    # get stereo or mono for rnnoise
-    audio_channel = "stereo" if is_default_mic_stereo() else "mono"
-    print(f"Microphone detected as {audio_channel}")
     
     lines = [
         f'Device: {microphone_device}',
-        f'VSTPlugin: Library LoudMax64.dll Thresh 0 Output 0.665909 "Fader Link" 0 "ISP Detection" 0 "Large GUI" 0',
-        f'VSTPlugin: Library win-rnnoise\\vst\\rnnoise_{audio_channel}.dll ChunkData "VkMyIdEAAAA8P3htbCB2ZXJzaW9uPSIxLjAiIGVuY29kaW5nPSJVVEYtOCI/PiA8Uk5Ob2lzZT48UEFSQU0gaWQ9InZhZF9ncmFjZV9wZXJpb2QiIHZhbHVlPSIyMC4wIi8+PFBBUkFNIGlkPSJ2YWRfcmV0cm9hY3RpdmVfZ3JhY2VfcGVyaW9kIiB2YWx1ZT0iMC4wIi8+PFBBUkFNIGlkPSJ2YWRfdGhyZXNob2xkIiB2YWx1ZT0iMC42NDk5OTk5NzYxNTgxNDIxIi8+PC9STk5vaXNlPgA="'
+        f'VSTPlugin: Library LoudMax64.dll Thresh 0 Output 0.665909 "Fader Link" 0 "ISP Detection" 0 "Large GUI" 0'
     ]
 
     # default config.txt file for EqualizerAPO (for overwriting)
@@ -266,7 +205,6 @@ def main():
     installer_url = "https://sourceforge.net/projects/equalizerapo/files/latest/download"
     download_file = "EqualizerAPO-setup.exe"
     loudmax_url = "https://www.dropbox.com/scl/fi/yovjswlx94m7u6qink5sk/LoudMax_v1_45_WIN_VST2.zip?rlkey=tjjc50g4h120n8jxf1iud6qyc&dl=1"
-    rnn_noise_url = get_latest_github_release_url("werman/noise-suppression-for-voice", "win-")
     vst_directory = "C:/Program Files/EqualizerAPO/VSTPlugins"
     microphone_device = "Default"
 
@@ -279,7 +217,6 @@ def main():
         microphone_device = run_equalizer_apo_device_selector(microphone_device)
         
         download_and_extract_zip(loudmax_url, vst_directory)
-        download_and_extract_zip(rnn_noise_url, vst_directory)
         configure_equalizer_apo(microphone_device)
     
     print("\nFINISHED. Closing in 3 seconds...\n")
